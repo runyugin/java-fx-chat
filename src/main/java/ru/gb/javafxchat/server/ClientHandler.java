@@ -5,30 +5,45 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 
-// класс ClientHandler для работы с socket клиентов, у каждого коиента он свой
-// socket это подключение к серверу
+import ru.gb.javafxchat.Command;
+
 public class ClientHandler {
+    private static final int AUTH_TIMEOUT = 120_000;
+
     private Socket socket;
-    private ChatServer server; // знает все о клиентах
+    private ChatServer server;
     private DataInputStream in;
     private DataOutputStream out;
     private String nick;
     private AuthService authService;
+    private Thread timeoutThread;
 
     public ClientHandler(Socket socket, ChatServer server, AuthService authService) {
         try {
-            // в конструкторе инициализируем поля
+            this.socket = socket;
+            this.server = server;
             this.authService = authService;
-            this.socket = socket; // сервер
-            this.server = server; // сокет
-            this.in = new DataInputStream(socket.getInputStream()); // поток для чтения сообщений
-            this.out = new DataOutputStream(socket.getOutputStream()); // поток для записи сообщений
-            new Thread(() -> { // отдельный тред для чтения сообщений
+            this.in = new DataInputStream(socket.getInputStream());
+            this.out = new DataOutputStream(socket.getOutputStream());
+
+            this.timeoutThread = new Thread(() -> {
                 try {
-                    authenticate(); // перед тем как читать сообщение от пользователя, его надо аутентифицировать по логину и паролю
-                    readMessages(); // для чтения сообщений от клиента
+                    Thread.sleep(AUTH_TIMEOUT);
+                    sendMessage(Command.STOP); // Если в другом потоке не будет вызван метод interrupt, то мы попадем сюда
+                } catch (InterruptedException e) {
+                    // В другом потоке была успешная авторизация
+                    System.out.println("Успешная авторизация");;
+                }
+            });
+            timeoutThread.start();
+
+            new Thread(() -> {
+                try {
+                    if (authenticate()) {
+                        readMessages();
+                    }
                 } finally {
-                    closeConnection(); // в конце, закрываем коннект
+                    closeConnection();
                 }
             }).start();
         } catch (IOException e) {
@@ -36,31 +51,32 @@ public class ClientHandler {
         }
     }
 
-    // в этом метоже мы читаем сообщения и ждем сообщение аутентификации
-    // по уиочанию сообщение аутентификации: /auth login password
-    private void authenticate() {
+    private boolean authenticate() {
         while (true) {
             try {
-                String message = in.readUTF(); // в цикле читаем сообщения
-                if (message.startsWith("/auth")) { // начинается сообщение аутентификации с команды "/auth"
-                    // метод split() делит сообщение на массив из трех слов
-                    String[] split = message.split("\\p{Blank}+");
-                    String login = split[1];
-                    String password = split[2];
-                    // сравниваем через метод getNickByLoginAndPassword() логин и пароль  и получаем ник
-                    String nick = authService.getNickByLoginAndPassword(login, password);
+                final String message = in.readUTF();
+                final Command command = Command.getCommand(message);
+                if (command == Command.END) {
+                    return false;
+                }
+                if (command == Command.AUTH) {
+                    final String[] params = command.parse(message);
+                    final String login = params[0];
+                    final String password = params[1];
+                    final String nick = authService.getNickByLoginAndPassword(login, password);
                     if (nick != null) {
-                        if (server.isNickBusy(nick)) { // проверка на пользователя с созданным ником
-                            sendMessage("Пользователь уже авторизован");
+                        if (server.isNickBusy(nick)) {
+                            sendMessage(Command.ERROR, "Пользователь уже авторизован");
                             continue;
                         }
-                        sendMessage("/authok " + nick);
+                        this.timeoutThread.interrupt(); // при вызове этого метода у спящего треда будет брошено InterruptedException
+                        sendMessage(Command.AUTHOK, nick);
                         this.nick = nick;
-                        server.broadcast("Пользователь " + nick + " зашел в чат");
+                        server.broadcast(Command.MESSAGE, "Пользователь " + nick + " зашел в чат");
                         server.subscribe(this);
-                        break; // если пользователь успешно авторизовался, то мы выходим из бесконечного цикла через break
+                        return true;
                     } else {
-                        sendMessage("Неверный логин и пароль");
+                        sendMessage(Command.ERROR, "Неверные логин и пароль");
                     }
                 }
             } catch (IOException e) {
@@ -69,8 +85,12 @@ public class ClientHandler {
         }
     }
 
+    public void sendMessage(Command command, String... params) {
+        sendMessage(command.collectMessage(params));
+    }
+
     private void closeConnection() {
-        sendMessage("/end"); // отправка сообщение клиенту перед закрытием соединения
+        sendMessage(Command.END);
         if (in != null) {
             try {
                 in.close();
@@ -95,7 +115,7 @@ public class ClientHandler {
         }
     }
 
-    public void sendMessage(String message) {
+    private void sendMessage(String message) {
         try {
             out.writeUTF(message);
         } catch (IOException e) {
@@ -104,20 +124,19 @@ public class ClientHandler {
     }
 
     private void readMessages() {
-        while (true) { // в бесконечном цике крутимся пока клиент не пришлет "/end"
+        while (true) {
             try {
-                String message = in.readUTF(); // читаем сообщения от клиента
-                if ("/end".equals(message)) {
-                    break; // если присылает "/end" делаем break
+                final String message = in.readUTF();
+                final Command command = Command.getCommand(message);
+                if (command == Command.END) {
+                    break;
                 }
-                if(message.startsWith("/w")){
-                    String nickTo = message.split(" ")[1];
-                    String mess = message.split(" ")[2];
-                    server.privateMessage(this, nickTo, mess);
+                if (command == Command.PRIVATE_MESSAGE) {
+                    final String[] params = command.parse(message);
+                    server.sendPrivateMessage(this, params[0], params[1]);
                     continue;
                 }
-                // для всех остальных сообщений вызываем метод broadcast, где рассылаем сообщения всем клиентам
-                server.broadcast(nick + ": " + message);
+                server.broadcast(Command.MESSAGE, nick + ": " + command.parse(message)[0]);
             } catch (IOException e) {
                 e.printStackTrace();
             }
