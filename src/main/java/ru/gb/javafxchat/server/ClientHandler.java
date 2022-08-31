@@ -79,6 +79,28 @@ public class ClientHandler {
                         sendMessage(Command.ERROR, "Неверные логин и пароль");
                     }
                 }
+
+
+                if (command == Command.REGISTRACION) {
+                    final String[] params = command.parse(message);
+                    final String login = params[0];
+                    final String password = params[1];
+                    final String nick = authService.regNickByLoginAndPassword(login,password);
+                    if (nick != null) {
+
+                        this.timeoutThread.interrupt(); // при вызове этого метода у спящего треда будет брошено InterruptedException
+                        sendMessage(Command.AUTHOK, nick);
+                        this.nick = nick;
+                        server.broadcast(Command.MESSAGE, "Пользователь " + nick + " зашел в чат");
+                        server.subscribe(this);
+                        return true;
+                    } else {
+                        sendMessage(Command.ERROR, "Пользователь c таким nick зарегестрирован");
+                    }
+                }
+
+
+
             } catch (IOException e) {
                 e.printStackTrace();
             }

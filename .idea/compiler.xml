@@ -9,7 +9,7 @@
         <module name="java-fx-chat" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
+    <bytecodeTargetLevel target="16">
       <module name="java-fx-chat" target="18" />
     </bytecodeTargetLevel>
   </component>

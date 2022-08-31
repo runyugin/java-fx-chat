@@ -4,6 +4,7 @@ package ru.gb.javafxchat.client;
 import java.io.IOException;
 import java.util.Optional;
 
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonBar;
@@ -17,6 +18,8 @@ import javafx.scene.layout.HBox;
 import ru.gb.javafxchat.Command;
 
 public class ChatController {
+    @FXML
+    public TextField nickField;
     @FXML
     private ListView<String> clientList;
     @FXML
@@ -96,6 +99,11 @@ public class ChatController {
         client.sendMessage(Command.AUTH, loginField.getText(), passField.getText());
     }
 
+
+    public void registrationBtnClick() {
+        client.sendMessage(Command.REGISTRACION, loginField.getText(), passField.getText());
+    }
+
     public void showError(String errorMessage) {
         final Alert alert = new Alert(Alert.AlertType.ERROR, errorMessage,
                 new ButtonType("OK", ButtonBar.ButtonData.OK_DONE));
@@ -123,5 +131,9 @@ public class ChatController {
 
     public ChatClient getClient() {
         return client;
+    }
+
+    public void clickSendNewNick() {
+        client.newNickfild(Command.NEWNICK, nickField.getText());
     }
 }

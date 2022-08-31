@@ -25,6 +25,7 @@
             <TextField fx:id="loginField" promptText="login"/>
             <PasswordField fx:id="passField" promptText="password"/>
             <Button text="Sign in" onAction="#signinBtnClick"/>
+            <Button text="Registration" onAction="#registrationBtnClick"/>
         </HBox>
         <HBox fx:id="messageBox" visible="false">
             <VBox>
@@ -32,6 +33,10 @@
                 <HBox spacing="10">
                     <TextField fx:id="messageField" HBox.hgrow="ALWAYS"/>
                     <Button text="Send" defaultButton="true" onAction="#clickSendButton"/>
+                </HBox>
+                <HBox spacing="10">
+                    <TextField fx:id="nickField" HBox.hgrow="ALWAYS"/>
+                    <Button text="NewNick" defaultButton="true" onAction="#clickSendNewNick"/>
                 </HBox>
             </VBox>
             <VBox>
