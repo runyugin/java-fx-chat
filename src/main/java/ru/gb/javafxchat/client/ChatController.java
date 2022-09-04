@@ -1,10 +1,12 @@
 package ru.gb.javafxchat.client;
 
-
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 
-import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonBar;
@@ -15,13 +17,14 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import ru.gb.javafxchat.Command;
 
 public class ChatController {
     @FXML
-    public TextField nickField;
-    @FXML
     private ListView<String> clientList;
+    @FXML
+    private TextField newUsernameField;
     @FXML
     private TextField loginField;
     @FXML
@@ -29,7 +32,7 @@ public class ChatController {
     @FXML
     private PasswordField passField;
     @FXML
-    private HBox messageBox;
+    private VBox messageBox;
     @FXML
     private TextArea messageArea;
     @FXML
@@ -38,6 +41,7 @@ public class ChatController {
     private final ChatClient client;
 
     private String selectedNick;
+
 
     public ChatController() {
         this.client = new ChatClient(this);
@@ -99,9 +103,15 @@ public class ChatController {
         client.sendMessage(Command.AUTH, loginField.getText(), passField.getText());
     }
 
+    public void changeUsernamemBtnClick() {
+        String newUsername = newUsernameField.getText();
+        if (newUsername == null && newUsername.isBlank()) {
+            // TODO: 22.08.2022 Show notification
+            return;
+        }
+        client.sendMessage(Command.CHANGE_USERNAME, newUsername);
 
-    public void registrationBtnClick() {
-        client.sendMessage(Command.REGISTRACION, loginField.getText(), passField.getText());
+        newUsernameField.clear();
     }
 
     public void showError(String errorMessage) {
@@ -133,7 +143,5 @@ public class ChatController {
         return client;
     }
 
-    public void clickSendNewNick() {
-        client.newNickfild(Command.NEWNICK, nickField.getText());
-    }
+
 }

@@ -6,4 +6,6 @@ module ru.gb.javafxchat {
 
     exports ru.gb.javafxchat.client;
     opens ru.gb.javafxchat.client to javafx.fxml;
+    exports ru.gb.javafxchat;
+    opens ru.gb.javafxchat to javafx.fxml;
 }

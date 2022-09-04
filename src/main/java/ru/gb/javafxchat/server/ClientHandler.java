@@ -14,15 +14,18 @@ public class ClientHandler {
     private ChatServer server;
     private DataInputStream in;
     private DataOutputStream out;
+    private String login;
     private String nick;
     private AuthService authService;
+    private UsernameService usernameService;
     private Thread timeoutThread;
 
-    public ClientHandler(Socket socket, ChatServer server, AuthService authService) {
+    public ClientHandler(Socket socket, ChatServer server, AuthService authService, UsernameService usernameService) {
         try {
             this.socket = socket;
             this.server = server;
             this.authService = authService;
+            this.usernameService = usernameService;
             this.in = new DataInputStream(socket.getInputStream());
             this.out = new DataOutputStream(socket.getOutputStream());
 
@@ -73,34 +76,13 @@ public class ClientHandler {
                         sendMessage(Command.AUTHOK, nick);
                         this.nick = nick;
                         server.broadcast(Command.MESSAGE, "Пользователь " + nick + " зашел в чат");
+                        this.login = login;
                         server.subscribe(this);
                         return true;
                     } else {
                         sendMessage(Command.ERROR, "Неверные логин и пароль");
                     }
                 }
-
-
-                if (command == Command.REGISTRACION) {
-                    final String[] params = command.parse(message);
-                    final String login = params[0];
-                    final String password = params[1];
-                    final String nick = authService.regNickByLoginAndPassword(login,password);
-                    if (nick != null) {
-
-                        this.timeoutThread.interrupt(); // при вызове этого метода у спящего треда будет брошено InterruptedException
-                        sendMessage(Command.AUTHOK, nick);
-                        this.nick = nick;
-                        server.broadcast(Command.MESSAGE, "Пользователь " + nick + " зашел в чат");
-                        server.subscribe(this);
-                        return true;
-                    } else {
-                        sendMessage(Command.ERROR, "Пользователь c таким nick зарегестрирован");
-                    }
-                }
-
-
-
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -158,6 +140,11 @@ public class ClientHandler {
                     server.sendPrivateMessage(this, params[0], params[1]);
                     continue;
                 }
+                if (command == Command.CHANGE_USERNAME) {
+                    String newUsername = command.parse(message)[0];
+                    rename(newUsername);
+                    continue;
+                }
                 server.broadcast(Command.MESSAGE, nick + ": " + command.parse(message)[0]);
             } catch (IOException e) {
                 e.printStackTrace();
@@ -165,7 +152,17 @@ public class ClientHandler {
         }
     }
 
+    private void rename(String newUsername) {
+        usernameService.updateUsername(login, newUsername);
+        setNick(newUsername);
+        server.broadcastClientsList();
+    }
+
     public String getNick() {
         return nick;
+    }
+
+    public void setNick(String nick) {
+        this.nick = nick;
     }
 }
