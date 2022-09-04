@@ -1,15 +1,21 @@
 package ru.gb.javafxchat.client;
 
-import static ru.gb.javafxchat.Command.*;
+import static ru.gb.javafxchat.Command.AUTHOK;
+import static ru.gb.javafxchat.Command.CLIENTS;
+import static ru.gb.javafxchat.Command.END;
+import static ru.gb.javafxchat.Command.ERROR;
+import static ru.gb.javafxchat.Command.MESSAGE;
+import static ru.gb.javafxchat.Command.STOP;
+import static ru.gb.javafxchat.Command.getCommand;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.Socket;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import javafx.application.Platform;
 import ru.gb.javafxchat.Command;
@@ -21,6 +27,8 @@ public class ChatClient {
     private DataOutputStream out;
 
     private final ChatController controller;
+
+    private Path file = Path.of("src/main/resources/ru/gb/javafxchat/history/text.txt");
 
     public ChatClient(ChatController controller) {
         this.controller = controller;
@@ -52,6 +60,7 @@ public class ChatClient {
             if (command == AUTHOK) { // /authok nick1
                 final String nick = params[0];
                 controller.setAuth(true);
+                controller.addMessage(readTextForFile(file));
                 controller.addMessage("Успешная авторизация под ником " + nick);
                 return true;
             }
@@ -69,6 +78,33 @@ public class ChatClient {
                 }
                 return false;
             }
+        }
+    }
+
+
+    private static String readTextForFile(Path path) {
+        try {
+            String result = "";
+            List<String> strings = Files.readAllLines(path);
+
+
+            List<String> stringsSub = new ArrayList<>();
+
+            if(strings.size()<100){
+                stringsSub = strings;
+            } else {
+                stringsSub = strings.subList(strings.size()-100, strings.size());
+            }
+
+            for (String line:stringsSub) {
+                result+=line+"\n";
+            }
+
+            return result;
+
+
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -130,28 +166,5 @@ public class ChatClient {
 
     public void sendMessage(Command command, String... params) {
         sendMessage(command.collectMessage(params));
-    }
-    private static Connection connection;
-    private static Statement createStatement() throws SQLException {
-        return connection.createStatement();
-    }
-    public void newNickfild(Command command, String text) {
-
-        try {
-
-            connection = DriverManager.getConnection("jdbc:sqlite:src/main/resources/ru/gb/javafxchat/database.db");
-            Statement statement = createStatement();
-            statement.executeUpdate("""
-                    update auth
-                    set username = newnick;
-                    where ()
-                    """);
-
-
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-
-
     }
 }
